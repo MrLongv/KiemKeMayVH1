@@ -83,7 +83,22 @@ const Api = {
   getByTag(tag, year){ return this.request(`/api/assets/by-tag/${encodeURIComponent(tag)}?year=${encodeURIComponent(year)}`); },
   saveAsset(payload){ return this.request('/api/assets', {method:'POST', body:JSON.stringify(payload)}); },
   deleteAsset(id){ return this.request(`/api/assets/${encodeURIComponent(id)}`, {method:'DELETE'}); },
-  bulkPatch(rows){ return this.request('/api/assets/bulk', {method:'PATCH', body:JSON.stringify({rows})}); }
+  importAssets(rows){
+  return this.request('/api/assets/import', {
+    method:'POST',
+    body:JSON.stringify({
+      year:getSelectedYear(),
+      rows
+    })
+  });
+},
+
+bulkPatch(rows){
+  return this.request('/api/assets/bulk', {
+    method:'PATCH',
+    body:JSON.stringify({rows})
+  });
+}
 };
 const Modal = {
   fields: ['soThe','soMay','loaiMay','viTri','ngayMua','noiMua','ghiChu','suaChua'],
@@ -294,6 +309,80 @@ const Qr = {
     navigator.clipboard?.writeText(link).then(()=>alert('Đã copy link QR:\n' + link)).catch(()=>prompt('Copy link QR:', link));
   }
 };
+const Importer = {
+  pick(){
+    if(!AppState.isAdmin()){
+      alert('Chỉ admin mới được nhập Excel');
+      return;
+    }
+    $('excelInput').click();
+  },
+
+  async readFile(file){
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+
+    const sheetName = wb.SheetNames.includes('DanhSachMay')
+      ? 'DanhSachMay'
+      : wb.SheetNames[0];
+
+    const ws = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+
+    const data = rows
+      .map(r => this.mapRow(r))
+      .filter(r => r.soThe);
+
+    if(!data.length){
+      alert('Không đọc được dữ liệu. Kiểm tra lại file Excel.');
+      return;
+    }
+
+    if(!confirm(`Nhập ${data.length} dòng vào năm ${getSelectedYear()}?\nNếu trùng Số thẻ sẽ ghi đè.`)){
+      return;
+    }
+
+    try{
+      setStatus('Đang nhập Excel...');
+      const res = await Api.importAssets(data);
+      await App.loadAssets();
+
+      alert(`Đã nhập xong:\n- Thêm mới: ${res.inserted || 0}\n- Ghi đè: ${res.updated || 0}`);
+      setStatus('Nhập Excel thành công', 'ok');
+    }catch(e){
+      alert(e.message);
+      setStatus(e.message, 'error');
+    }
+  },
+
+  mapRow(r){
+    return {
+      soThe: clean(r['Số thẻ']),
+      soMay: clean(r['Số máy']),
+      loaiMay: clean(r['Loại máy']),
+      viTri: clean(r['Vị trí']),
+      ghiChu: clean(r['Đơn vị mượn'] || r['Đơn vị mượn'] || r['Ghi chú']),
+
+      daKiemKe: bool(r['Kiểm kê']),
+      chonIn: bool(r['In mã QR']),
+
+      ngayMua: formatDateDDMMYYYY(r['Ngày mua/mượn'] || r['Ngày mua/mượn']),
+      noiMua: clean(r['Nơi mua']),
+
+      bdQ1: bool(r['Bảo dưỡng Q1'] || r['Bảo dưỡng Q1']),
+      bdQ2: bool(r['Bảo dưỡng Q2'] || r['Bảo dưỡng Q2']),
+      bdQ3: bool(r['Bảo dưỡng Q3'] || r['Bảo dưỡng Q3']),
+      bdQ4: bool(r['Bảo dưỡng Q4'] || r['Bảo dưỡng Q4']),
+
+      bdNgayQ1: '',
+      bdNgayQ2: '',
+      bdNgayQ3: '',
+      bdNgayQ4: '',
+
+      suaChua: clean(r['Sửa chữa'])
+    };
+  }
+};
 const App = {
   init(){
     this.fillYears();
@@ -376,6 +465,13 @@ const App = {
     $('statusFilter').onchange = () => Table.render();
     $('searchInput').oninput = debounce(()=>Table.render(), 180);
     $('btnExportCsv').onclick = () => Exporter.csv();
+    $('btnImportExcel').onclick = () => Importer.pick();
+
+$('excelInput').onchange = e => {
+  const file = e.target.files[0];
+  if(file) Importer.readFile(file);
+  e.target.value = '';
+};
     $('btnPrintQr').onclick = () => Printer.printQr();
     $('btnPrintProfile').onclick = () => Printer.printProfile();
     $('btnCheckAllPrint').onclick = () => this.setPrintForFiltered(true);
