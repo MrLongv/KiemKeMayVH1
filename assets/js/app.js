@@ -495,3 +495,38 @@ $('excelInput').onchange = e => {
 };
 
 document.addEventListener('DOMContentLoaded', () => App.init());
+function formatDateDDMMYYYY(v){
+
+  if(v === null || v === undefined || v === ''){
+    return '';
+  }
+
+  // Excel serial date
+  if(typeof v === 'number' || /^\d+$/.test(v)){
+
+    const num = Number(v);
+
+    // Excel serial date thường > 30000
+    if(num > 30000){
+
+      const excelEpoch = new Date(1899, 11, 30);
+
+      const d = new Date(
+        excelEpoch.getTime() + num * 86400000
+      );
+
+      const dd = String(d.getDate()).padStart(2,'0');
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const yyyy = d.getFullYear();
+
+      return `${dd}/${mm}/${yyyy}`;
+    }
+  }
+
+  // đã đúng format rồi
+  if(String(v).includes('/')){
+    return String(v);
+  }
+
+  return String(v);
+}
