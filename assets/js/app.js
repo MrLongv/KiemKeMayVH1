@@ -1,7 +1,5 @@
 window.APP_CONFIG = {
-  // Nếu index.html và Worker cùng domain: để rỗng ''.
-  // Nếu index.html đặt ở GitHub Pages: nhập Worker URL, ví dụ 'https://kiem-ke-api.tenban.workers.dev'
-  API_BASE: '',
+  API_BASE: 'https://kiem-ke-may-api.hoalangiongxoai.workers.dev',
   ADMIN_SESSION_HOURS: 12,
   DEFAULT_YEAR_BACK: 8,
   DEFAULT_YEAR_FORWARD: 1,
