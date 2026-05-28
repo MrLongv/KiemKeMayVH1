@@ -18,16 +18,7 @@ function setStatus(text, type='info'){
   el.style.color = type === 'error' ? '#dc2626' : type === 'ok' ? '#15803d' : '#0f62fe';
 }
 function getSelectedYear(){ return Number($('yearSelect')?.value || new Date().getFullYear()); }
-function formatDateDDMMYYYY(v){
-  if(!v && v !== 0) return '';
-  const s = String(v).trim();
-  if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if(m) return `${m[3]}/${m[2]}/${m[1]}`;
-  const d = new Date(s);
-  if(Number.isNaN(d.getTime())) return s;
-  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
-}
+
 function normalizeText(str){
   return String(str ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 }
@@ -46,21 +37,46 @@ function debounce(fn, wait=250){ let t; return (...args)=>{ clearTimeout(t); t=s
 const AppState = {
   token: localStorage.getItem('kk_token') || '',
   role: localStorage.getItem('kk_role') || '',
+
   assets: [],
   filtered: [],
+
+  // PHÂN TRANG
+  page: 1,
+  pageSize: window.innerWidth <= 768 ? 50 : 100,
+
   editingId: null,
   hashOpened: false,
-  isAdmin(){ return this.role === 'admin'; },
-  isViewer(){ return this.role === 'viewer'; },
+
+  isAdmin(){
+    return this.role === 'admin';
+  },
+
+  isViewer(){
+    return this.role === 'viewer';
+  },
+
   saveSession(token, role){
-    this.token = token; this.role = role;
+    this.token = token;
+    this.role = role;
+
     localStorage.setItem('kk_token', token);
     localStorage.setItem('kk_role', role);
     localStorage.setItem('kk_login_at', String(Date.now()));
   },
+
   clearSession(){
-    this.token = ''; this.role = ''; this.assets = []; this.filtered = [];
-    localStorage.removeItem('kk_token'); localStorage.removeItem('kk_role'); localStorage.removeItem('kk_login_at');
+    this.token = '';
+    this.role = '';
+
+    this.assets = [];
+    this.filtered = [];
+
+    this.page = 1;
+
+    localStorage.removeItem('kk_token');
+    localStorage.removeItem('kk_role');
+    localStorage.removeItem('kk_login_at');
   }
 };
 const Api = {
@@ -160,40 +176,90 @@ const Table = {
   localFilter(){
     const q = normalizeText($('searchInput').value);
     const filter = $('statusFilter').value;
+
     AppState.filtered = AppState.assets.filter(a => {
-      const text = normalizeText([a.soThe,a.soMay,a.loaiMay,a.viTri,a.ghiChu,a.noiMua,a.ngayMua,a.suaChua].join(' '));
+      const text = normalizeText([
+        a.soThe,
+        a.soMay,
+        a.loaiMay,
+        a.viTri,
+        a.ghiChu,
+        a.noiMua,
+        a.ngayMua,
+        a.suaChua
+      ].join(' '));
+
       if(q && !text.includes(q)) return false;
       if(filter === 'daKiemKe' && !a.daKiemKe) return false;
       if(filter === 'chuaKiemKe' && a.daKiemKe) return false;
       if(filter === 'daIn' && !a.chonIn) return false;
       if(filter === 'chuaIn' && a.chonIn) return false;
       if(filter === 'canBaoDuong' && a.bdQ1 && a.bdQ2 && a.bdQ3 && a.bdQ4) return false;
+
       return true;
     });
   },
+
+  pageCount(){
+    return Math.max(1, Math.ceil(AppState.filtered.length / AppState.pageSize));
+  },
+
+  pageRows(){
+    const start = (AppState.page - 1) * AppState.pageSize;
+    return AppState.filtered.slice(start, start + AppState.pageSize);
+  },
+
   render(){
     this.localFilter();
+
+    const maxPage = this.pageCount();
+    if(AppState.page > maxPage) AppState.page = maxPage;
+    if(AppState.page < 1) AppState.page = 1;
+
     this.renderKpis();
-    $('resultInfo').textContent = `${AppState.filtered.length} / ${AppState.assets.length} dòng`;
+
+    $('resultInfo').textContent =
+      `${AppState.filtered.length} / ${AppState.assets.length} dòng`;
+
+    const pagerInfo = $('pagerInfo');
+    if(pagerInfo){
+      pagerInfo.textContent =
+        `Trang ${AppState.page}/${maxPage} · ${AppState.pageSize} dòng/trang`;
+    }
+
+    const prev = $('btnPrevPage');
+    const next = $('btnNextPage');
+
+    if(prev) prev.disabled = AppState.page <= 1;
+    if(next) next.disabled = AppState.page >= maxPage;
+
     const tbody = $('assetTable').querySelector('tbody');
-    tbody.innerHTML = AppState.filtered.map((a, idx) => this.rowHtml(a, idx)).join('');
+    const startIndex = (AppState.page - 1) * AppState.pageSize;
+
+    tbody.innerHTML = this.pageRows()
+      .map((a, idx) => this.rowHtml(a, startIndex + idx))
+      .join('');
+
     Qr.highlightFromHash();
   },
+
   rowHtml(a, idx){
     const checkedDisabled = AppState.isAdmin() ? '' : 'disabled';
+
     const actionButtons = AppState.isAdmin()
       ? `<button class="tiny-btn primary" data-act="edit" data-id="${a.id}"><i class="fa-solid fa-pen"></i></button><button class="tiny-btn" data-act="link" data-id="${a.id}"><i class="fa-solid fa-link"></i></button>`
       : `<button class="tiny-btn primary" data-act="view" data-id="${a.id}"><i class="fa-solid fa-eye"></i></button>`;
+
     return `<tr data-id="${esc(a.id)}" data-tag="${esc(a.soThe)}">
-      <td class="sticky-col col-stt">${idx+1}</td>
+      <td class="sticky-col col-stt">${idx + 1}</td>
       <td class="sticky-col col-tag"><b>VH-${esc(a.soThe)}</b></td>
       <td class="sticky-col col-machine">${esc(a.soMay)}</td>
       <td><div class="clamp">${esc(a.loaiMay)}</div></td>
       <td><div class="clamp">${esc(a.viTri)}</div></td>
       <td><div class="clamp">${esc(a.ghiChu)}</div></td>
       <td class="no-print"><div class="row-actions">${actionButtons}</div></td>
-      <td><input class="row-check" data-field="daKiemKe" type="checkbox" ${a.daKiemKe?'checked':''} ${checkedDisabled}></td>
-      <td><input class="row-check" data-field="chonIn" type="checkbox" ${a.chonIn?'checked':''} ${checkedDisabled}></td>
+      <td><input class="row-check" data-field="daKiemKe" type="checkbox" ${a.daKiemKe ? 'checked' : ''} ${checkedDisabled}></td>
+      <td><input class="row-check" data-field="chonIn" type="checkbox" ${a.chonIn ? 'checked' : ''} ${checkedDisabled}></td>
       <td>${esc(formatDateDDMMYYYY(a.ngayMua))}</td>
       <td><div class="clamp">${esc(a.noiMua)}</div></td>
       <td>${this.qBadge(a.bdQ1, a.bdNgayQ1)}</td>
@@ -203,26 +269,52 @@ const Table = {
       <td><div class="clamp">${esc(a.suaChua)}</div></td>
     </tr>`;
   },
+
   qBadge(done, date){
-    return done ? `<span class="badge yes" title="${esc(formatDateDDMMYYYY(date))}">✓</span>` : '<span class="badge no">–</span>';
+    return done
+      ? `<span class="badge yes" title="${esc(formatDateDDMMYYYY(date))}">✓</span>`
+      : '<span class="badge no">–</span>';
   },
+
   renderKpis(){
     const total = AppState.assets.length;
-    const checked = AppState.assets.filter(x=>x.daKiemKe).length;
-    const print = AppState.assets.filter(x=>x.chonIn).length;
-    const q1 = AppState.assets.filter(x=>x.bdQ1).length;
-    const q2 = AppState.assets.filter(x=>x.bdQ2).length;
-    const need = AppState.assets.filter(x=>!(x.bdQ1 && x.bdQ2 && x.bdQ3 && x.bdQ4)).length;
+    const checked = AppState.assets.filter(x => x.daKiemKe).length;
+    const print = AppState.assets.filter(x => x.chonIn).length;
+    const q1 = AppState.assets.filter(x => x.bdQ1).length;
+    const q2 = AppState.assets.filter(x => x.bdQ2).length;
+    const need = AppState.assets.filter(x => !(x.bdQ1 && x.bdQ2 && x.bdQ3 && x.bdQ4)).length;
+
     $('kpiGrid').innerHTML = [
-      ['Tổng máy', total], ['Đã kiểm kê', checked], ['Chưa kiểm kê', total-checked], ['Đã chọn in', print], ['BD Q1/Q2', `${q1}/${q2}`], ['Còn thiếu BD', need]
-    ].map(([label,value])=>`<div class="kpi"><span>${label}</span><b>${value}</b></div>`).join('');
+      ['Tổng máy', total],
+      ['Đã kiểm kê', checked],
+      ['Chưa kiểm kê', total - checked],
+      ['Đã chọn in', print],
+      ['BD Q1/Q2', `${q1}/${q2}`],
+      ['Còn thiếu BD', need]
+    ].map(([label, value]) =>
+      `<div class="kpi"><span>${label}</span><b>${value}</b></div>`
+    ).join('');
   },
-  findById(id){ return AppState.assets.find(a => String(a.id) === String(id)); },
+
+  findById(id){
+    return AppState.assets.find(a => String(a.id) === String(id));
+  },
+
   async patchCheckbox(id, field, value){
-    const asset = this.findById(id); if(!asset) return;
+    const asset = this.findById(id);
+    if(!asset) return;
+
     asset[field] = value;
-    try{ await Api.saveAsset({...asset, nam:getSelectedYear()}); setStatus('Đã lưu thay đổi', 'ok'); this.render(); }
-    catch(e){ asset[field] = !value; setStatus(e.message, 'error'); this.render(); }
+
+    try{
+      await Api.saveAsset({...asset, nam:getSelectedYear()});
+      setStatus('Đã lưu thay đổi', 'ok');
+      this.render();
+    }catch(e){
+      asset[field] = !value;
+      setStatus(e.message, 'error');
+      this.render();
+    }
   }
 };
 const Exporter = {
@@ -461,9 +553,18 @@ const App = {
     $('btnLogout').onclick = () => this.logout();
     $('btnReload').onclick = () => this.loadAssets();
     $('btnAdd').onclick = () => Modal.open(null);
-    $('yearSelect').onchange = () => this.loadAssets();
-    $('statusFilter').onchange = () => Table.render();
-    $('searchInput').oninput = debounce(()=>Table.render(), 180);
+    $('yearSelect').onchange = () => {
+  AppState.page = 1;
+  this.loadAssets();
+};
+    $('statusFilter').onchange = () => {
+  AppState.page = 1;
+  Table.render();
+};
+    $('searchInput').oninput = debounce(() => {
+  AppState.page = 1;
+  Table.render();
+}, 180);
     $('btnExportCsv').onclick = () => Exporter.csv();
     $('btnImportExcel').onclick = () => Importer.pick();
 
@@ -491,6 +592,32 @@ $('excelInput').onchange = e => {
       const row = cb.closest('tr'); Table.patchCheckbox(row.dataset.id, cb.dataset.field, cb.checked);
     });
     window.addEventListener('hashchange', () => Qr.openFromHash());
+    $('btnPrevPage').onclick = () => {
+
+  AppState.page--;
+
+  if(AppState.page < 1){
+    AppState.page = 1;
+  }
+
+  Table.render();
+};
+
+$('btnNextPage').onclick = () => {
+
+  AppState.page++;
+
+  const maxPage = Math.max(
+    1,
+    Math.ceil(AppState.filtered.length / AppState.pageSize)
+  );
+
+  if(AppState.page > maxPage){
+    AppState.page = maxPage;
+  }
+
+  Table.render();
+};
   }
 };
 
