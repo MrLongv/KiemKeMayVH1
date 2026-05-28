@@ -6,31 +6,73 @@ window.APP_CONFIG = {
   COMPANY_NAME_TOP: 'CÔNG TY TNHH MAY XK',
   COMPANY_NAME_BOTTOM: 'VIỆT HỒNG'
 };
+
 const $ = (id) => document.getElementById(id);
 const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 const esc = (v) => String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const clean = (v) => String(v ?? '').trim();
 const bool = (v) => v === true || v === 1 || v === '1' || String(v).toLowerCase() === 'true' || String(v).toLowerCase() === 'yes' || String(v).includes('✅');
+
 function setStatus(text, type='info'){
   const el = $('statusText');
   if(!el) return;
   el.textContent = text;
   el.style.color = type === 'error' ? '#dc2626' : type === 'ok' ? '#15803d' : '#0f62fe';
 }
+
 function getSelectedYear(){ return Number($('yearSelect')?.value || new Date().getFullYear()); }
+
+// Robust date formatter:
+// Supports Excel serial (number), dd/MM/yyyy, ISO yyyy-mm-dd, and other parseable strings.
+// Returns '' for null/undefined/empty.
 function formatDateDDMMYYYY(v){
-  if(!v && v !== 0) return '';
+  if(v === null || v === undefined || v === '') return '';
+
+  // If already a Date object
+  if(v instanceof Date && !Number.isNaN(v.getTime())){
+    return `${String(v.getDate()).padStart(2,'0')}/${String(v.getMonth()+1).padStart(2,'0')}/${v.getFullYear()}`;
+  }
+
+  // If numeric (Excel serial may come as number or numeric string)
   const s = String(v).trim();
-  if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if(m) return `${m[3]}/${m[2]}/${m[1]}`;
+
+  if(/^\d+$/.test(s)){
+    const num = Number(s);
+    // Treat numbers > 29500 as Excel serial dates (roughly after year 1980)
+    if(!Number.isNaN(num) && num > 29500){
+      const excelEpoch = new Date(1899, 11, 30);
+      const d = new Date(excelEpoch.getTime() + Math.round(num) * 86400000);
+      return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    }
+  }
+
+  // If already in dd/MM/yyyy -> return normalized
+  if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+    // normalize padding
+    const [d,m,y] = s.split('/');
+    return `${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}/${y}`;
+  }
+
+  // ISO yyyy-mm-dd or starts-with yyyy-mm-dd
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(iso){
+    return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  }
+
+  // Fallback: try Date parse
   const d = new Date(s);
-  if(Number.isNaN(d.getTime())) return s;
-  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  if(!Number.isNaN(d.getTime())){
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  }
+
+  // default: return original trimmed
+  return s;
 }
+
 function normalizeText(str){
   return String(str ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 }
+
 function currentBaseUrl(){ return location.href.split('#')[0]; }
 function downloadText(filename, text, mime='text/plain;charset=utf-8'){
   const blob = new Blob([text], {type:mime});
@@ -43,6 +85,7 @@ function csvCell(v){
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
 }
 function debounce(fn, wait=250){ let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args),wait); }; }
+
 const AppState = {
   token: localStorage.getItem('kk_token') || '',
   role: localStorage.getItem('kk_role') || '',
@@ -63,15 +106,40 @@ const AppState = {
     localStorage.removeItem('kk_token'); localStorage.removeItem('kk_role'); localStorage.removeItem('kk_login_at');
   }
 };
+
 const Api = {
   base(){ return (window.APP_CONFIG?.API_BASE || '').replace(/\/$/, ''); },
   async request(path, options={}){
-    const headers = Object.assign({'Content-Type':'application/json'}, options.headers || {});
+    const method = (options.method || 'GET').toUpperCase();
+    const headers = Object.assign({}, options.headers || {});
+    // Only set Content-Type when there is a body and it's likely JSON
+    if(method !== 'GET' && method !== 'HEAD' && options.body && !headers['Content-Type']){
+      headers['Content-Type'] = 'application/json';
+    }
+    headers['Accept'] = headers['Accept'] || 'application/json';
     if(AppState.token) headers.Authorization = `Bearer ${AppState.token}`;
-    const res = await fetch(this.base() + path, Object.assign({}, options, {headers}));
-    const data = await res.json().catch(() => ({success:false, message:'API không trả JSON'}));
-    if(!res.ok || data.success === false) throw new Error(data.message || `Lỗi API ${res.status}`);
-    return data;
+
+    let res;
+    try{
+      res = await fetch(this.base() + path, Object.assign({}, options, {headers}));
+    }catch(err){
+      throw new Error('Không thể kết nối tới API: ' + (err.message || err));
+    }
+
+    // Try parse JSON, tolerate non-JSON
+    let data = null;
+    try{ data = await res.json(); }catch(e){ data = null; }
+
+    if(!res.ok){
+      // If 401 or token-related, bubble a clear message
+      const msg = (data && data.message) ? data.message : `Lỗi API ${res.status}`;
+      throw new Error(msg);
+    }
+    if(data && data.success === false){
+      throw new Error(data.message || 'Lỗi API');
+    }
+    // If server returned raw non-JSON but OK, return object wrapper
+    return data ?? { success:true };
   },
   loginAdmin(password){ return this.request('/api/login', {method:'POST', body:JSON.stringify({password})}); },
   loginViewer(){ return this.request('/api/login', {method:'POST', body:JSON.stringify({mode:'viewer'})}); },
@@ -84,22 +152,22 @@ const Api = {
   saveAsset(payload){ return this.request('/api/assets', {method:'POST', body:JSON.stringify(payload)}); },
   deleteAsset(id){ return this.request(`/api/assets/${encodeURIComponent(id)}`, {method:'DELETE'}); },
   importAssets(rows){
-  return this.request('/api/assets/import', {
-    method:'POST',
-    body:JSON.stringify({
-      year:getSelectedYear(),
-      rows
-    })
-  });
-},
-
-bulkPatch(rows){
-  return this.request('/api/assets/bulk', {
-    method:'PATCH',
-    body:JSON.stringify({rows})
-  });
-}
+    return this.request('/api/assets/import', {
+      method:'POST',
+      body:JSON.stringify({
+        year:getSelectedYear(),
+        rows
+      })
+    });
+  },
+  bulkPatch(rows){
+    return this.request('/api/assets/bulk', {
+      method:'PATCH',
+      body:JSON.stringify({rows})
+    });
+  }
 };
+
 const Modal = {
   fields: ['soThe','soMay','loaiMay','viTri','ngayMua','noiMua','ghiChu','suaChua'],
   checks: ['daKiemKe','chonIn','bdQ1','bdQ2','bdQ3','bdQ4'],
@@ -156,6 +224,7 @@ const Modal = {
     };
   }
 };
+
 const Table = {
   localFilter(){
     const q = normalizeText($('searchInput').value);
@@ -225,6 +294,7 @@ const Table = {
     catch(e){ asset[field] = !value; setStatus(e.message, 'error'); this.render(); }
   }
 };
+
 const Exporter = {
   csv(){
     const headers = ['STT','Số thẻ','Số máy','Loại máy','Vị trí','Ghi chú','Đã kiểm kê','Chọn in QR','Ngày mua','Nơi mua','BD Q1','Ngày BD Q1','BD Q2','Ngày BD Q2','BD Q3','Ngày BD Q3','BD Q4','Ngày BD Q4','Sửa chữa','Năm'];
@@ -236,6 +306,7 @@ const Exporter = {
     downloadText(`kiem-ke-may-${getSelectedYear()}.csv`, csv, 'text/csv;charset=utf-8');
   }
 };
+
 const Printer = {
   selectedForQr(){ return AppState.assets.filter(a => a.chonIn); },
   printQr(){
@@ -283,6 +354,7 @@ const Printer = {
     return `<table>${rows.map(([k,v])=>`<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>`;
   }
 };
+
 const Qr = {
   currentTag(){ return decodeURIComponent(location.hash.replace(/^#/, '') || '').trim(); },
   async openFromHash(){
@@ -301,6 +373,7 @@ const Qr = {
   },
   highlightFromHash(){
     const tag = this.currentTag(); if(!tag) return;
+    // Use CSS.escape to match attribute value safely
     const row = document.querySelector(`#assetTable tbody tr[data-tag="${CSS.escape(tag)}"]`);
     if(row){ row.classList.add('hash-hit'); setTimeout(()=>row.scrollIntoView({behavior:'smooth', block:'center'}), 80); }
   },
@@ -309,6 +382,7 @@ const Qr = {
     navigator.clipboard?.writeText(link).then(()=>alert('Đã copy link QR:\n' + link)).catch(()=>prompt('Copy link QR:', link));
   }
 };
+
 const Importer = {
   pick(){
     if(!AppState.isAdmin()){
@@ -355,39 +429,51 @@ const Importer = {
     }
   },
 
+  // Map Excel row -> server schema. Try multiple column name variants.
   mapRow(r){
+    // helper to read alternative column names
+    const get = (...keys) => {
+      for(const k of keys){
+        if(k in r && r[k] !== undefined && r[k] !== null && String(r[k]).trim() !== '') return r[k];
+      }
+      return '';
+    };
+
+    // try read bd date columns if present
+    const bdNgayQ1Raw = get('Ngày BD Q1','Ngay BD Q1','Ngày BD Q1','Ngày BD Q1','Ngày BD Q1','Ngày BD Q1','Ngày_BD_Q1','BD Q1 Ngày');
+    const bdNgayQ2Raw = get('Ngày BD Q2','BD Q2 Ngày','Ngày_BD_Q2','BD Q2');
+    const bdNgayQ3Raw = get('Ngày BD Q3','BD Q3 Ngày','Ngày_BD_Q3');
+    const bdNgayQ4Raw = get('Ngày BD Q4','BD Q4 Ngày','Ngày_BD_Q4');
+
     return {
-      soThe: clean(r['Số thẻ']),
-      soMay: clean(r['Số máy']),
-      loaiMay: clean(r['Loại máy']),
-      viTri: clean(r['Vị trí']),
-      ghiChu: clean(r['Đơn vị mượn'] || r['Đơn vị mượn'] || r['Ghi chú']),
-
-      daKiemKe: bool(r['Kiểm kê']),
-      chonIn: bool(r['In mã QR']),
-
-      ngayMua: formatDateDDMMYYYY(r['Ngày mua/mượn'] || r['Ngày mua/mượn']),
-      noiMua: clean(r['Nơi mua']),
-
-      bdQ1: bool(r['Bảo dưỡng Q1'] || r['Bảo dưỡng Q1']),
-      bdQ2: bool(r['Bảo dưỡng Q2'] || r['Bảo dưỡng Q2']),
-      bdQ3: bool(r['Bảo dưỡng Q3'] || r['Bảo dưỡng Q3']),
-      bdQ4: bool(r['Bảo dưỡng Q4'] || r['Bảo dưỡng Q4']),
-
-      bdNgayQ1: '',
-      bdNgayQ2: '',
-      bdNgayQ3: '',
-      bdNgayQ4: '',
-
-      suaChua: clean(r['Sửa chữa'])
+      soThe: clean(get('Số thẻ','So the','Số thẻ ')),
+      soMay: clean(get('Số máy','Số máy ')),
+      loaiMay: clean(get('Loại máy','Loai may')),
+      viTri: clean(get('Vị trí','Vi tri','Vị trí ')),
+      ghiChu: clean(get('Đơn vị mượn', 'Đơn vị mượn', 'Ghi chú', 'Ghi chu')),
+      daKiemKe: bool(get('Kiểm kê','Kiem ke','Kiểm kê ')),
+      chonIn: bool(get('In mã QR','In mã qr','In mã QR ')),
+      ngayMua: formatDateDDMMYYYY(get('Ngày mua/mượn','Ngày mua/mượn','Ngày mua','Ngay mua')),
+      noiMua: clean(get('Nơi mua','Noi mua')),
+      bdQ1: bool(get('Bảo dưỡng Q1','Bảo dưỡng Q1','BD Q1')),
+      bdQ2: bool(get('Bảo dưỡng Q2','Bảo dưỡng Q2','BD Q2')),
+      bdQ3: bool(get('Bảo dưỡng Q3','Bảo dưỡng Q3','BD Q3')),
+      bdQ4: bool(get('Bảo dưỡng Q4','Bảo dưỡng Q4','BD Q4')),
+      bdNgayQ1: formatDateDDMMYYYY(bdNgayQ1Raw || ''),
+      bdNgayQ2: formatDateDDMMYYYY(bdNgayQ2Raw || ''),
+      bdNgayQ3: formatDateDDMMYYYY(bdNgayQ3Raw || ''),
+      bdNgayQ4: formatDateDDMMYYYY(bdNgayQ4Raw || ''),
+      suaChua: clean(get('Sửa chữa','Sua chua','Sửa chữa '))
     };
   }
 };
+
 const App = {
   init(){
     this.fillYears();
     this.bindEvents();
     this.restoreUi();
+    // If URL had hash, attempt open — but don't block init
     if(Qr.currentTag()) Qr.openFromHash();
   },
   fillYears(){
@@ -402,6 +488,13 @@ const App = {
     $('yearSelect').value = saved;
   },
   restoreUi(){
+    // If token exists, check expiry (kk_login_at + ADMIN_SESSION_HOURS)
+    const loginAt = Number(localStorage.getItem('kk_login_at') || 0);
+    const maxHours = Number(window.APP_CONFIG?.ADMIN_SESSION_HOURS || 12);
+    if(loginAt && Date.now() - loginAt > maxHours * 3600 * 1000){
+      AppState.clearSession();
+    }
+
     if(AppState.token && AppState.role){ this.showApp(); this.loadAssets(); }
     else this.showLogin();
   },
@@ -430,10 +523,34 @@ const App = {
       AppState.assets = (r.data || []).map(this.normalizeAsset);
       Table.render();
       setStatus(`Đã tải ${AppState.assets.length} dòng`, 'ok');
-    }catch(e){ setStatus(e.message, 'error'); if(String(e.message).includes('token') || String(e.message).includes('hết hạn')) this.logout(); }
+    }catch(e){
+      setStatus(e.message, 'error');
+      const msg = String(e.message || '').toLowerCase();
+      if(msg.includes('token') || msg.includes('hết hạn') || msg.includes('đăng nhập')) {
+        // token invalid/expired -> clear session
+        AppState.clearSession();
+        this.showLogin();
+      }
+    }
   },
   normalizeAsset(a){
-    return { id:a.id, soThe:a.soThe||'', soMay:a.soMay||'', loaiMay:a.loaiMay||'', viTri:a.viTri||'', ghiChu:a.ghiChu||'', daKiemKe:!!a.daKiemKe, chonIn:!!a.chonIn, ngayMua:formatDateDDMMYYYY(a.ngayMua||''), noiMua:a.noiMua||'', bdQ1:!!a.bdQ1, bdNgayQ1:formatDateDDMMYYYY(a.bdNgayQ1||''), bdQ2:!!a.bdQ2, bdNgayQ2:formatDateDDMMYYYY(a.bdNgayQ2||''), bdQ3:!!a.bdQ3, bdNgayQ3:formatDateDDMMYYYY(a.bdNgayQ3||''), bdQ4:!!a.bdQ4, bdNgayQ4:formatDateDDMMYYYY(a.bdNgayQ4||''), suaChua:a.suaChua||'', nam:a.nam || getSelectedYear(), updatedAt:a.updatedAt || '' };
+    return {
+      id:a.id,
+      soThe:a.soThe||'',
+      soMay:a.soMay||'',
+      loaiMay:a.loaiMay||'',
+      viTri:a.viTri||'',
+      ghiChu:a.ghiChu||'',
+      daKiemKe:!!a.daKiemKe,
+      chonIn:!!a.chonIn,
+      ngayMua:formatDateDDMMYYYY(a.ngayMua||''),
+      noiMua:a.noiMua||'',
+      bdQ1:!!a.bdQ1, bdNgayQ1:formatDateDDMMYYYY(a.bdNgayQ1||''),
+      bdQ2:!!a.bdQ2, bdNgayQ2:formatDateDDMMYYYY(a.bdNgayQ2||''),
+      bdQ3:!!a.bdQ3, bdNgayQ3:formatDateDDMMYYYY(a.bdNgayQ3||''),
+      bdQ4:!!a.bdQ4, bdNgayQ4:formatDateDDMMYYYY(a.bdNgayQ4||''),
+      suaChua:a.suaChua||'', nam:a.nam || getSelectedYear(), updatedAt:a.updatedAt || ''
+    };
   },
   async saveAsset(payload){
     if(!payload.soThe){ alert('Số thẻ không được trống.'); return; }
@@ -467,11 +584,11 @@ const App = {
     $('btnExportCsv').onclick = () => Exporter.csv();
     $('btnImportExcel').onclick = () => Importer.pick();
 
-$('excelInput').onchange = e => {
-  const file = e.target.files[0];
-  if(file) Importer.readFile(file);
-  e.target.value = '';
-};
+    $('excelInput').onchange = e => {
+      const file = e.target.files[0];
+      if(file) Importer.readFile(file);
+      e.target.value = '';
+    };
     $('btnPrintQr').onclick = () => Printer.printQr();
     $('btnPrintProfile').onclick = () => Printer.printProfile();
     $('btnCheckAllPrint').onclick = () => this.setPrintForFiltered(true);
@@ -495,38 +612,3 @@ $('excelInput').onchange = e => {
 };
 
 document.addEventListener('DOMContentLoaded', () => App.init());
-function formatDateDDMMYYYY(v){
-
-  if(v === null || v === undefined || v === ''){
-    return '';
-  }
-
-  // Excel serial date
-  if(typeof v === 'number' || /^\d+$/.test(v)){
-
-    const num = Number(v);
-
-    // Excel serial date thường > 30000
-    if(num > 30000){
-
-      const excelEpoch = new Date(1899, 11, 30);
-
-      const d = new Date(
-        excelEpoch.getTime() + num * 86400000
-      );
-
-      const dd = String(d.getDate()).padStart(2,'0');
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      const yyyy = d.getFullYear();
-
-      return `${dd}/${mm}/${yyyy}`;
-    }
-  }
-
-  // đã đúng format rồi
-  if(String(v).includes('/')){
-    return String(v);
-  }
-
-  return String(v);
-}
