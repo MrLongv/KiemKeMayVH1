@@ -376,29 +376,75 @@ const Printer = {
   }
 };
 const Qr = {
-  currentTag(){ return decodeURIComponent(location.hash.replace(/^#/, '') || '').trim(); },
-  async openFromHash(){
+  currentTag(){
+    return decodeURIComponent(location.hash.replace(/^#/, '') || '').trim();
+  },
+
+  findIndexByTag(tag){
+    return AppState.filtered.findIndex(a =>
+      String(a.soThe).trim() === String(tag).trim()
+    );
+  },
+
+  goToHashRow(){
     const tag = this.currentTag();
-    if(!tag) return false;
-    try{
-      if(!AppState.token){ await App.loginViewer(true); }
-      await App.loadAssets();
-      const asset = AppState.assets.find(a => String(a.soThe).trim() === tag);
-      if(asset){ Modal.open(asset); this.highlightFromHash(); return true; }
-      const r = await Api.getByTag(tag, getSelectedYear());
-      if(r?.data){ Modal.open(r.data); return true; }
+
+    if(!tag || !AppState.assets.length){
+      return;
+    }
+
+    // đảm bảo bỏ filter để thấy được dòng QR
+    $('searchInput').value = '';
+    $('statusFilter').value = 'all';
+
+    Table.localFilter();
+
+    const idx = this.findIndexByTag(tag);
+
+    if(idx === -1){
       alert('Không tìm thấy máy: ' + tag);
-    }catch(e){ alert(e.message); }
-    return false;
+      return;
+    }
+
+    AppState.page = Math.floor(idx / AppState.pageSize) + 1;
+
+    Table.render();
+
+    setTimeout(() => {
+      this.highlightFromHash();
+    }, 120);
   },
+
   highlightFromHash(){
-    const tag = this.currentTag(); if(!tag) return;
-    const row = document.querySelector(`#assetTable tbody tr[data-tag="${CSS.escape(tag)}"]`);
-    if(row){ row.classList.add('hash-hit'); setTimeout(()=>row.scrollIntoView({behavior:'smooth', block:'center'}), 80); }
+    const tag = this.currentTag();
+
+    if(!tag){
+      return;
+    }
+
+    document
+      .querySelectorAll('#assetTable tbody tr.hash-hit')
+      .forEach(row => row.classList.remove('hash-hit'));
+
+    const row = document.querySelector(
+      `#assetTable tbody tr[data-tag="${CSS.escape(tag)}"]`
+    );
+
+    if(row){
+      row.classList.add('hash-hit');
+      row.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }
   },
+
   copyLink(asset){
     const link = `${currentBaseUrl()}#${encodeURIComponent(asset.soThe)}`;
-    navigator.clipboard?.writeText(link).then(()=>alert('Đã copy link QR:\n' + link)).catch(()=>prompt('Copy link QR:', link));
+
+    navigator.clipboard?.writeText(link)
+      .then(() => alert('Đã copy link QR:\n' + link))
+      .catch(() => prompt('Copy link QR:', link));
   }
 };
 const Importer = {
@@ -480,7 +526,7 @@ const App = {
     this.fillYears();
     this.bindEvents();
     this.restoreUi();
-    if(Qr.currentTag()) Qr.openFromHash();
+    // if(Qr.currentTag()) Qr.openFromHash();
   },
   fillYears(){
     const y = new Date().getFullYear();
@@ -494,9 +540,17 @@ const App = {
     $('yearSelect').value = saved;
   },
   restoreUi(){
-    if(AppState.token && AppState.role){ this.showApp(); this.loadAssets(); }
-    else this.showLogin();
-  },
+  if(AppState.token && AppState.role){
+    this.showApp();
+    this.loadAssets().then(() => {
+      if(Qr.currentTag()){
+        Qr.goToHashRow();
+      }
+    });
+  } else {
+    this.showLogin();
+  }
+},
   showLogin(){
     $('loginView').classList.remove('hidden'); $('appView').classList.add('hidden'); $('btnLogout').classList.add('hidden');
     $('rolePill').textContent = 'Chưa đăng nhập'; document.body.classList.remove('viewer-mode');
@@ -506,9 +560,22 @@ const App = {
     $('rolePill').textContent = AppState.isAdmin() ? 'Admin' : 'Chỉ xem'; document.body.classList.toggle('viewer-mode', AppState.isViewer());
   },
   async loginAdmin(){
-    try{ const r = await Api.loginAdmin($('passwordInput').value); AppState.saveSession(r.token, r.role); this.showApp(); await this.loadAssets(); }
-    catch(e){ alert(e.message); $('passwordInput').focus(); }
-  },
+  try{
+    const r = await Api.loginAdmin($('passwordInput').value);
+    AppState.saveSession(r.token, r.role);
+    this.showApp();
+
+    await this.loadAssets();
+
+    if(Qr.currentTag()){
+      Qr.goToHashRow();
+    }
+
+  }catch(e){
+    alert(e.message);
+    $('passwordInput').focus();
+  }
+},
   async loginViewer(silent=false){
     try{ const r = await Api.loginViewer(); AppState.saveSession(r.token, r.role); this.showApp(); return r; }
     catch(e){ if(!silent) alert(e.message); throw e; }
@@ -591,7 +658,13 @@ $('excelInput').onchange = e => {
       const cb = e.target.closest('.row-check'); if(!cb || !AppState.isAdmin()) return;
       const row = cb.closest('tr'); Table.patchCheckbox(row.dataset.id, cb.dataset.field, cb.checked);
     });
-    window.addEventListener('hashchange', () => Qr.openFromHash());
+    window.addEventListener('hashchange', () => {
+  if(AppState.token && AppState.role){
+    Qr.goToHashRow();
+  }else{
+    App.showLogin();
+  }
+});
     $('btnPrevPage').onclick = () => {
 
   AppState.page--;
