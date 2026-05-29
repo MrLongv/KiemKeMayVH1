@@ -246,9 +246,12 @@ select:disabled{
 }
 
 .login-actions{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
+  display:flex;
+  justify-content:center;
+}
+
+.login-actions .btn{
+  width:185px;
 }
 
 /* =========================================================
