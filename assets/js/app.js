@@ -249,7 +249,11 @@ const Api = {
 
     return this.request('/api/assets?' + params.toString());
   },
-
+exportAllAssets(year){
+  return this.request(
+    `/api/assets/export?year=${encodeURIComponent(year || getSelectedYear())}`
+  );
+},
   getByTag(tag, year){
     return this.request(
       `/api/assets/by-tag/${encodeURIComponent(tag)}?year=${encodeURIComponent(year)}`
@@ -521,52 +525,62 @@ const Table = {
    EXPORT
 ========================================================= */
 const Exporter = {
-  csv(){
-    const headers = [
-      'STT','Số thẻ','Số máy','Loại máy','Vị trí','Ghi chú',
-      'Đã kiểm kê','Chọn in QR','Ngày mua','Nơi mua',
-      'BD Q1','Ngày BD Q1','BD Q2','Ngày BD Q2',
-      'BD Q3','Ngày BD Q3','BD Q4','Ngày BD Q4',
-      'Sửa chữa','Năm'
-    ];
+  async csv(){
+    try{
+      setStatus('Đang xuất toàn bộ dữ liệu...');
 
-    const startIndex = (AppState.page - 1) * AppState.pageSize;
+      const r = await Api.exportAllAssets(getSelectedYear());
+      const list = (r.data || []).map(a => App.normalizeAsset(a));
 
-    const rows = AppState.filtered.map((a, i) => [
-      startIndex + i + 1,
-      a.soThe,
-      a.soMay,
-      a.loaiMay,
-      a.viTri,
-      a.ghiChu,
-      a.daKiemKe ? 'TRUE' : 'FALSE',
-      a.chonIn ? 'TRUE' : 'FALSE',
-      a.ngayMua,
-      a.noiMua,
-      a.bdQ1 ? 'TRUE' : 'FALSE',
-      a.bdNgayQ1,
-      a.bdQ2 ? 'TRUE' : 'FALSE',
-      a.bdNgayQ2,
-      a.bdQ3 ? 'TRUE' : 'FALSE',
-      a.bdNgayQ3,
-      a.bdQ4 ? 'TRUE' : 'FALSE',
-      a.bdNgayQ4,
-      a.suaChua,
-      a.nam || getSelectedYear()
-    ]);
+      const headers = [
+        'STT','Số thẻ','Số máy','Loại máy','Vị trí','Ghi chú',
+        'Đã kiểm kê','Chọn in QR','Ngày mua','Nơi mua',
+        'BD Q1','Ngày BD Q1','BD Q2','Ngày BD Q2',
+        'BD Q3','Ngày BD Q3','BD Q4','Ngày BD Q4',
+        'Sửa chữa','Năm'
+      ];
 
-    const csv = '\uFEFF' + [headers, ...rows]
-      .map(r => r.map(csvCell).join(','))
-      .join('\n');
+      const rows = list.map((a, i) => [
+        i + 1,
+        a.soThe,
+        a.soMay,
+        a.loaiMay,
+        a.viTri,
+        a.ghiChu,
+        a.daKiemKe ? 'TRUE' : 'FALSE',
+        a.chonIn ? 'TRUE' : 'FALSE',
+        a.ngayMua,
+        a.noiMua,
+        a.bdQ1 ? 'TRUE' : 'FALSE',
+        a.bdNgayQ1,
+        a.bdQ2 ? 'TRUE' : 'FALSE',
+        a.bdNgayQ2,
+        a.bdQ3 ? 'TRUE' : 'FALSE',
+        a.bdNgayQ3,
+        a.bdQ4 ? 'TRUE' : 'FALSE',
+        a.bdNgayQ4,
+        a.suaChua,
+        a.nam || getSelectedYear()
+      ]);
 
-    downloadText(
-      `kiem-ke-may-${getSelectedYear()}-trang-${AppState.page}.csv`,
-      csv,
-      'text/csv;charset=utf-8'
-    );
+      const csv = '\uFEFF' + [headers, ...rows]
+        .map(r => r.map(csvCell).join(','))
+        .join('\n');
+
+      downloadText(
+        `kiem-ke-may-${getSelectedYear()}-tat-ca.csv`,
+        csv,
+        'text/csv;charset=utf-8'
+      );
+
+      setStatus(`Đã xuất ${list.length} dòng`, 'ok');
+
+    }catch(e){
+      alert(e.message);
+      setStatus(e.message, 'error');
+    }
   }
 };
-
 /* =========================================================
    PRINT
 ========================================================= */
