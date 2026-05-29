@@ -1217,13 +1217,7 @@ const App = {
         this.loginAdmin();
       }
     };
-
-    $('btnViewer').onclick = () => {
-      this.loginViewer()
-        .then(() => this.loadAssets())
-        .catch(() => {});
-    };
-
+   
     $('btnLogout').onclick = () => this.logout();
 
     $('btnReload').onclick = () => {
