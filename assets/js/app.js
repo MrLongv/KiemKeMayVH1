@@ -251,9 +251,9 @@ const Table = {
       : `<button class="tiny-btn primary" data-act="view" data-id="${a.id}"><i class="fa-solid fa-eye"></i></button>`;
 
     return `<tr data-id="${esc(a.id)}" data-tag="${esc(a.soThe)}">
-      <td class="sticky-col col-stt">${idx + 1}</td>
+      <td class="col-stt">${idx + 1}</td>
       <td class="sticky-col col-tag"><b>VH-${esc(a.soThe)}</b></td>
-      <td class="sticky-col col-machine">${esc(a.soMay)}</td>
+      <td class="col-machine">${esc(a.soMay)}</td>
       <td><div class="clamp">${esc(a.loaiMay)}</div></td>
       <td><div class="clamp">${esc(a.viTri)}</div></td>
       <td><div class="clamp">${esc(a.ghiChu)}</div></td>
