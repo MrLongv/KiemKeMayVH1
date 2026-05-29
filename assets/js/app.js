@@ -527,53 +527,72 @@ const Table = {
 const Exporter = {
   async csv(){
     try{
-      setStatus('Đang xuất toàn bộ dữ liệu...');
+      setStatus('Đang xuất Excel toàn bộ dữ liệu...');
 
       const r = await Api.exportAllAssets(getSelectedYear());
       const list = (r.data || []).map(a => App.normalizeAsset(a));
 
-      const headers = [
-        'STT','Số thẻ','Số máy','Loại máy','Vị trí','Ghi chú',
-        'Đã kiểm kê','Chọn in QR','Ngày mua','Nơi mua',
-        'BD Q1','Ngày BD Q1','BD Q2','Ngày BD Q2',
-        'BD Q3','Ngày BD Q3','BD Q4','Ngày BD Q4',
-        'Sửa chữa','Năm'
+      const rows = list.map((a, i) => ({
+        'STT': i + 1,
+        'Số thẻ': a.soThe,
+        'Số máy': a.soMay,
+        'Loại máy': a.loaiMay,
+        'Vị trí': a.viTri,
+        'Ghi chú': a.ghiChu,
+        'Đã kiểm kê': a.daKiemKe ? 'TRUE' : 'FALSE',
+        'Chọn in QR': a.chonIn ? 'TRUE' : 'FALSE',
+        'Ngày mua': a.ngayMua,
+        'Nơi mua': a.noiMua,
+        'BD Q1': a.bdQ1 ? 'TRUE' : 'FALSE',
+        'Ngày BD Q1': a.bdNgayQ1,
+        'BD Q2': a.bdQ2 ? 'TRUE' : 'FALSE',
+        'Ngày BD Q2': a.bdNgayQ2,
+        'BD Q3': a.bdQ3 ? 'TRUE' : 'FALSE',
+        'Ngày BD Q3': a.bdNgayQ3,
+        'BD Q4': a.bdQ4 ? 'TRUE' : 'FALSE',
+        'Ngày BD Q4': a.bdNgayQ4,
+        'Sửa chữa': a.suaChua,
+        'Năm': a.nam || getSelectedYear()
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+
+      ws['!cols'] = [
+        {wch:6},
+        {wch:12},
+        {wch:16},
+        {wch:28},
+        {wch:24},
+        {wch:26},
+        {wch:12},
+        {wch:12},
+        {wch:14},
+        {wch:22},
+        {wch:10},
+        {wch:14},
+        {wch:10},
+        {wch:14},
+        {wch:10},
+        {wch:14},
+        {wch:10},
+        {wch:14},
+        {wch:30},
+        {wch:8}
       ];
 
-      const rows = list.map((a, i) => [
-        i + 1,
-        a.soThe,
-        a.soMay,
-        a.loaiMay,
-        a.viTri,
-        a.ghiChu,
-        a.daKiemKe ? 'TRUE' : 'FALSE',
-        a.chonIn ? 'TRUE' : 'FALSE',
-        a.ngayMua,
-        a.noiMua,
-        a.bdQ1 ? 'TRUE' : 'FALSE',
-        a.bdNgayQ1,
-        a.bdQ2 ? 'TRUE' : 'FALSE',
-        a.bdNgayQ2,
-        a.bdQ3 ? 'TRUE' : 'FALSE',
-        a.bdNgayQ3,
-        a.bdQ4 ? 'TRUE' : 'FALSE',
-        a.bdNgayQ4,
-        a.suaChua,
-        a.nam || getSelectedYear()
-      ]);
-
-      const csv = '\uFEFF' + [headers, ...rows]
-        .map(r => r.map(csvCell).join(','))
-        .join('\n');
-
-      downloadText(
-        `kiem-ke-may-${getSelectedYear()}-tat-ca.csv`,
-        csv,
-        'text/csv;charset=utf-8'
+      XLSX.utils.book_append_sheet(
+        wb,
+        ws,
+        `KiemKe_${getSelectedYear()}`
       );
 
-      setStatus(`Đã xuất ${list.length} dòng`, 'ok');
+      XLSX.writeFile(
+        wb,
+        `kiem-ke-may-${getSelectedYear()}-tat-ca.xlsx`
+      );
+
+      setStatus(`Đã xuất Excel ${list.length} dòng`, 'ok');
 
     }catch(e){
       alert(e.message);
