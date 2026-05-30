@@ -615,12 +615,15 @@ const Exporter = {
    PRINT
 ========================================================= */
 const Printer = {
-  selectedForQr(){
-    return AppState.assets.filter(a => a.chonIn);
-  },
+ async selectedForQr(){
+  const r = await Api.exportAllAssets(getSelectedYear());
+  return (r.data || [])
+    .map(a => App.normalizeAsset(a))
+    .filter(a => a.chonIn);
+},
 
-  printQr(){
-    const list = this.selectedForQr();
+  async printQr(){
+    const list = await this.selectedForQr();
 
     if(!list.length){
       alert('Chưa có dòng nào được chọn in QR trên trang hiện tại.');
