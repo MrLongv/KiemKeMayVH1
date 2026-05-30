@@ -316,8 +316,9 @@ const Modal = {
     this.setValues(asset || {});
     this.setReadonly(AppState.isViewer());
 
-    $('btnDeleteAsset').style.visibility =
-      asset && AppState.isAdmin() ? 'visible' : 'hidden';
+if($('btnDeleteAsset')){
+  $('btnDeleteAsset').style.display = 'none';
+}
 
     $('assetModal').classList.add('open');
     $('assetModal').setAttribute('aria-hidden','false');
@@ -1303,7 +1304,9 @@ async setPrintForFiltered(value){
 
     $('btnCancelModal').onclick = () => Modal.close();
 
-    $('btnDeleteAsset').onclick = () => this.deleteCurrent();
+    if($('btnDeleteAsset')){
+  $('btnDeleteAsset').onclick = () => this.deleteCurrent();
+}
 
     $('assetModal').addEventListener('click', e => {
       if(e.target.id === 'assetModal'){
