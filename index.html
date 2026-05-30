@@ -4,10 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Kiểm kê máy Việt Hồng</title>
+
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <link rel="stylesheet" href="assets/css/style.css" />
+
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
+
 <body>
   <header class="topbar">
     <div class="brand">
@@ -17,22 +20,31 @@
         <p>Dữ liệu Cloudflare D1 · Giữ QR cũ dạng <b>#Số_thẻ</b></p>
       </div>
     </div>
+
     <div class="top-actions">
       <span id="rolePill" class="pill">Chưa đăng nhập</span>
-      <button id="btnLogout" class="btn btn-light hidden" type="button"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
+      <button id="btnLogout" class="btn btn-light hidden" type="button">
+        <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+      </button>
     </div>
   </header>
 
   <main>
     <section id="loginView" class="login-shell">
       <div class="login-card">
-        <div class="login-icon"><i class="fa-solid fa-qrcode"></i></div>
+        <div class="login-icon">
+          <i class="fa-solid fa-qrcode"></i>
+        </div>
+
         <h2>Đăng nhập kiểm kê</h2>
-        <p id="loginHint">Admin để thêm/sửa dữ liệu.</p>
+        <p id="loginHint">Nhập mật khẩu Admin để xem và chỉnh sửa dữ liệu.</p>
+
         <input id="passwordInput" type="password" placeholder="Nhập mật khẩu admin" autocomplete="current-password" />
+
         <div class="login-actions">
-          <button id="btnLogin" class="btn btn-primary" type="button"><i class="fa-solid fa-lock-open"></i> Admin</button>
-        
+          <button id="btnLogin" class="btn btn-primary" type="button">
+            <i class="fa-solid fa-lock-open"></i> Admin
+          </button>
         </div>
       </div>
     </section>
@@ -40,42 +52,66 @@
     <section id="appView" class="app-shell hidden">
       <aside class="sidebar no-print">
         <div class="side-title">Bộ lọc</div>
+
         <label>Năm kiểm kê</label>
         <select id="yearSelect"></select>
 
-        <label>Trạng thái</label>
+        <label>Lọc dữ liệu</label>
         <select id="statusFilter">
           <option value="all">Tất cả</option>
+
           <option value="daKiemKe">Đã kiểm kê</option>
           <option value="chuaKiemKe">Chưa kiểm kê</option>
+
           <option value="daIn">Đã chọn in QR</option>
           <option value="chuaIn">Chưa chọn in QR</option>
-          <option value="canBaoDuong">Còn thiếu bảo dưỡng</option>
+
+          <option value="dangDung">Trạng thái: Đang dùng</option>
+          <option value="hong">Trạng thái: Hỏng</option>
+          <option value="thanhLy">Trạng thái: Thanh lý</option>
+          <option value="mat">Trạng thái: Mất</option>
         </select>
 
         <label>Tìm kiếm</label>
         <input id="searchInput" type="text" placeholder="Số thẻ, số máy, vị trí..." />
 
-        <button id="btnReload" class="btn btn-muted full" type="button"><i class="fa-solid fa-rotate"></i> Tải lại</button>
-        <button id="btnAdd" class="btn btn-primary full admin-only" type="button"><i class="fa-solid fa-plus"></i> Thêm máy</button>
-        <input type="file" id="excelInput" accept=".xlsx,.xls" hidden>
+        <button id="btnReload" class="btn btn-muted full" type="button">
+          <i class="fa-solid fa-rotate"></i> Tải lại
+        </button>
 
-<button id="btnImportExcel" class="btn btn-success full admin-only" type="button">
-  <i class="fa-solid fa-file-import"></i> Nhập Excel
-</button>
-        <button id="btnExportCsv" class="btn btn-success full" type="button"><i class="fa-solid fa-file-csv"></i> Xuất Excel theo năm</button>
-        <button id="btnPrintQr" class="btn btn-warning full" type="button"><i class="fa-solid fa-print"></i> In tem QR đã chọn</button>
+        <button id="btnAdd" class="btn btn-primary full admin-only" type="button">
+          <i class="fa-solid fa-plus"></i> Thêm máy
+        </button>
+
+        <input type="file" id="excelInput" accept=".xlsx,.xls" hidden />
+
+        <button id="btnImportExcel" class="btn btn-success full admin-only" type="button">
+          <i class="fa-solid fa-file-import"></i> Nhập Excel
+        </button>
+
+        <button id="btnExportCsv" class="btn btn-success full" type="button">
+          <i class="fa-solid fa-file-excel"></i> Xuất Excel theo năm
+        </button>
+
+        <button id="btnPrintQr" class="btn btn-warning full" type="button">
+          <i class="fa-solid fa-print"></i> In tem QR đã chọn
+        </button>
 
         <div class="print-box">
           <label>In lý lịch</label>
           <input id="profileInput" type="text" placeholder="Số thẻ: 1,2 hoặc all" />
-          <button id="btnPrintProfile" class="btn btn-dark full" type="button"><i class="fa-solid fa-file-lines"></i> In lý lịch</button>
+
+          <button id="btnPrintProfile" class="btn btn-dark full" type="button">
+            <i class="fa-solid fa-file-lines"></i> In lý lịch
+          </button>
         </div>
       </aside>
 
       <section class="content">
         <div class="notice no-print">
-          <div><b>Lưu ý:</b> Nếu domain/path giữ nguyên như lúc in QR cũ, QR vẫn mở đúng máy qua phần sau dấu #.</div>
+          <div>
+            <b>Lưu ý:</b> Không xóa máy đã dán QR. Nếu máy hỏng/thanh lý/mất thì đổi trạng thái để giữ lịch sử.
+          </div>
           <div id="statusText">Sẵn sàng</div>
         </div>
 
@@ -88,9 +124,15 @@
               <p id="resultInfo">0 dòng</p>
               <div id="pagerInfo" class="pager-info">Trang 1/1</div>
             </div>
+
             <div class="table-actions admin-only">
-              <button id="btnCheckAllPrint" class="btn btn-muted" type="button">Chọn tất cả QR đang lọc</button>
-              <button id="btnUncheckAllPrint" class="btn btn-muted" type="button">Bỏ chọn QR</button>
+              <button id="btnCheckAllPrint" class="btn btn-muted" type="button">
+                Chọn tất cả QR đang lọc
+              </button>
+
+              <button id="btnUncheckAllPrint" class="btn btn-muted" type="button">
+                Bỏ chọn QR
+              </button>
             </div>
           </div>
 
@@ -99,11 +141,12 @@
               <thead>
                 <tr>
                   <th class="col-stt">STT</th>
-<th class="sticky-col col-tag">Số thẻ</th>
-<th class="col-machine">Số máy</th>
+                  <th class="sticky-col col-tag">Số thẻ</th>
+                  <th class="col-machine">Số máy</th>
                   <th>Loại máy</th>
                   <th>Vị trí</th>
                   <th>Ghi chú</th>
+                  <th>Trạng thái</th>
                   <th class="no-print">Hành động</th>
                   <th>Đã KK</th>
                   <th>In QR</th>
@@ -116,13 +159,15 @@
                   <th>Sửa chữa</th>
                 </tr>
               </thead>
+
               <tbody></tbody>
             </table>
           </div>
+
           <div class="pager no-print">
-  <button id="btnPrevPage" class="btn btn-muted" type="button">◀ Trước</button>
-  <button id="btnNextPage" class="btn btn-muted" type="button">Sau ▶</button>
-</div>
+            <button id="btnPrevPage" class="btn btn-muted" type="button">◀ Trước</button>
+            <button id="btnNextPage" class="btn btn-muted" type="button">Sau ▶</button>
+          </div>
         </div>
       </section>
     </section>
@@ -132,37 +177,105 @@
     <div class="modal-card">
       <div class="modal-head">
         <h2 id="modalTitle">Chỉnh sửa máy</h2>
-        <button id="btnCloseModal" class="icon-btn" type="button" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>
+
+        <button id="btnCloseModal" class="icon-btn" type="button" aria-label="Đóng">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
       </div>
 
       <form id="assetForm">
         <div class="form-grid">
-          <div class="field"><label>Số thẻ <span>*</span></label><input id="m_soThe" name="soThe" required /></div>
-          <div class="field"><label>Số máy</label><input id="m_soMay" name="soMay" /></div>
-          <div class="field"><label>Loại máy</label><input id="m_loaiMay" name="loaiMay" /></div>
-          <div class="field"><label>Vị trí</label><input id="m_viTri" name="viTri" /></div>
-          <div class="field"><label>Ngày mua</label><input id="m_ngayMua" name="ngayMua" placeholder="dd/MM/yyyy" /></div>
-          <div class="field"><label>Nơi mua</label><input id="m_noiMua" name="noiMua" /></div>
-          <div class="field wide"><label>Ghi chú</label><textarea id="m_ghiChu" name="ghiChu" rows="3"></textarea></div>
-          <div class="field wide"><label>Sửa chữa</label><textarea id="m_suaChua" name="suaChua" rows="3"></textarea></div>
+          <div class="field">
+            <label>Số thẻ <span>*</span></label>
+            <input id="m_soThe" name="soThe" required />
+          </div>
+
+          <div class="field">
+            <label>Số máy</label>
+            <input id="m_soMay" name="soMay" />
+          </div>
+
+          <div class="field">
+            <label>Loại máy</label>
+            <input id="m_loaiMay" name="loaiMay" />
+          </div>
+
+          <div class="field">
+            <label>Vị trí</label>
+            <input id="m_viTri" name="viTri" />
+          </div>
+
+          <div class="field">
+            <label>Trạng thái</label>
+            <select id="m_trangThai" name="trangThai">
+              <option value="Đang dùng">Đang dùng</option>
+              <option value="Hỏng">Hỏng</option>
+              <option value="Thanh lý">Thanh lý</option>
+              <option value="Mất">Mất</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Ngày mua</label>
+            <input id="m_ngayMua" name="ngayMua" placeholder="dd/MM/yyyy" />
+          </div>
+
+          <div class="field">
+            <label>Nơi mua</label>
+            <input id="m_noiMua" name="noiMua" />
+          </div>
+
+          <div class="field wide">
+            <label>Ghi chú</label>
+            <textarea id="m_ghiChu" name="ghiChu" rows="3"></textarea>
+          </div>
+
+          <div class="field wide">
+            <label>Sửa chữa</label>
+            <textarea id="m_suaChua" name="suaChua" rows="3"></textarea>
+          </div>
         </div>
 
         <div class="checkbox-line">
-          <label><input id="m_daKiemKe" type="checkbox" /> Đã kiểm kê</label>
-          <label><input id="m_chonIn" type="checkbox" /> Chọn để in QR</label>
+          <label>
+            <input id="m_daKiemKe" type="checkbox" /> Đã kiểm kê
+          </label>
+
+          <label>
+            <input id="m_chonIn" type="checkbox" /> Chọn để in QR
+          </label>
         </div>
 
         <h3 class="section-title">Bảo dưỡng theo quý</h3>
+
         <div class="quarter-grid">
-          <div class="quarter"><label><input id="m_bdQ1" type="checkbox" /> Q1</label><input id="m_bdNgayQ1" type="text" placeholder="Ngày BD Q1" /></div>
-          <div class="quarter"><label><input id="m_bdQ2" type="checkbox" /> Q2</label><input id="m_bdNgayQ2" type="text" placeholder="Ngày BD Q2" /></div>
-          <div class="quarter"><label><input id="m_bdQ3" type="checkbox" /> Q3</label><input id="m_bdNgayQ3" type="text" placeholder="Ngày BD Q3" /></div>
-          <div class="quarter"><label><input id="m_bdQ4" type="checkbox" /> Q4</label><input id="m_bdNgayQ4" type="text" placeholder="Ngày BD Q4" /></div>
+          <div class="quarter">
+            <label><input id="m_bdQ1" type="checkbox" /> Q1</label>
+            <input id="m_bdNgayQ1" type="text" placeholder="Ngày BD Q1" />
+          </div>
+
+          <div class="quarter">
+            <label><input id="m_bdQ2" type="checkbox" /> Q2</label>
+            <input id="m_bdNgayQ2" type="text" placeholder="Ngày BD Q2" />
+          </div>
+
+          <div class="quarter">
+            <label><input id="m_bdQ3" type="checkbox" /> Q3</label>
+            <input id="m_bdNgayQ3" type="text" placeholder="Ngày BD Q3" />
+          </div>
+
+          <div class="quarter">
+            <label><input id="m_bdQ4" type="checkbox" /> Q4</label>
+            <input id="m_bdNgayQ4" type="text" placeholder="Ngày BD Q4" />
+          </div>
         </div>
 
         <div class="modal-actions">
           <button class="btn btn-muted" type="button" id="btnCancelModal">Đóng</button>
-          <button id="btnSaveAsset" class="btn btn-primary admin-only" type="submit"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>
+
+          <button id="btnSaveAsset" class="btn btn-primary admin-only" type="submit">
+            <i class="fa-solid fa-floppy-disk"></i> Lưu
+          </button>
         </div>
       </form>
     </div>
