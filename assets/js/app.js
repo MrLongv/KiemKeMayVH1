@@ -1,8 +1,9 @@
 window.APP_CONFIG = {
   API_BASE: 'https://kiem-ke-may-api.hoalangiongxoai.workers.dev',
   ADMIN_SESSION_HOURS: 12,
-  DEFAULT_YEAR_BACK: 8,
-  DEFAULT_YEAR_FORWARD: 1,
+DEFAULT_YEAR_BACK: 0,
+DEFAULT_YEAR_FORWARD: 1,
+START_YEAR: 2026,
   COMPANY_NAME_TOP: 'CÔNG TY TNHH MAY XK',
   COMPANY_NAME_BOTTOM: 'VIỆT HỒNG'
 };
@@ -973,24 +974,31 @@ const App = {
     this.restoreUi();
   },
 
-  fillYears(){
-    const y = new Date().getFullYear();
-    const back = window.APP_CONFIG.DEFAULT_YEAR_BACK || 8;
-    const forward = window.APP_CONFIG.DEFAULT_YEAR_FORWARD || 1;
-    const saved = localStorage.getItem('kk_year') || String(y);
+fillYears(){
+  const currentYear = new Date().getFullYear();
+  const startYear = window.APP_CONFIG.START_YEAR || 2026;
+  const forward = window.APP_CONFIG.DEFAULT_YEAR_FORWARD || 1;
 
-    $('yearSelect').innerHTML = '';
+  const maxYear = currentYear + forward;
+  const saved = localStorage.getItem('kk_year') || String(currentYear);
 
-    for(let year = y + forward; year >= y - back; year--){
-      const opt = document.createElement('option');
-      opt.value = year;
-      opt.textContent = year;
-      $('yearSelect').appendChild(opt);
-    }
+  $('yearSelect').innerHTML = '';
 
+  for(let year = maxYear; year >= startYear; year--){
+    const opt = document.createElement('option');
+    opt.value = year;
+    opt.textContent = year;
+    $('yearSelect').appendChild(opt);
+  }
+
+  const savedYear = Number(saved);
+
+  if(savedYear >= startYear && savedYear <= maxYear){
     $('yearSelect').value = saved;
-  },
-
+  }else{
+    $('yearSelect').value = String(currentYear >= startYear ? currentYear : startYear);
+  }
+},
   restoreUi(){
     if(AppState.token && AppState.role){
       this.showApp();
