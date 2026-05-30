@@ -290,7 +290,17 @@ exportAllAssets(year){
     });
   }
 };
-
+setPrintAllFiltered({year, q='', filter='all', value=false}){
+  return this.request('/api/assets/print-all', {
+    method:'PATCH',
+    body:JSON.stringify({
+      year: year || getSelectedYear(),
+      q,
+      filter,
+      value
+    })
+  });
+},
 /* =========================================================
    MODAL
 ========================================================= */
@@ -1184,31 +1194,42 @@ const App = {
     }
   },
 
-  async setPrintForFiltered(value){
-    if(!AppState.filtered.length){
-      return;
-    }
+async setPrintForFiltered(value){
+  const q = clean($('searchInput').value);
+  const filter = $('statusFilter').value;
+  const total = AppState.totalRows || AppState.filtered.length;
 
-    if(!confirm(`${value ? 'Chọn' : 'Bỏ chọn'} in QR cho ${AppState.filtered.length} dòng đang hiển thị?`)){
-      return;
-    }
+  if(!total){
+    return;
+  }
 
-    try{
-      const rows = AppState.filtered.map(a => ({
-        id:a.id,
-        chonIn:value
-      }));
+  const text = value
+    ? `Chọn in QR cho TẤT CẢ ${total} dòng trong danh sách đang lọc?`
+    : `Bỏ chọn in QR cho TẤT CẢ ${total} dòng trong danh sách đang lọc?`;
 
-      await Api.bulkPatch(rows);
-      await this.loadAssets();
+  if(!confirm(text)){
+    return;
+  }
 
-      setStatus('Đã cập nhật chọn in QR', 'ok');
+  try{
+    setStatus('Đang cập nhật QR toàn bộ danh sách...');
 
-    }catch(e){
-      alert(e.message);
-    }
-  },
+    const r = await Api.setPrintAllFiltered({
+      year:getSelectedYear(),
+      q,
+      filter,
+      value
+    });
 
+    await this.loadAssets();
+
+    setStatus(`Đã cập nhật ${r.updated || 0} dòng`, 'ok');
+
+  }catch(e){
+    alert(e.message);
+    setStatus(e.message, 'error');
+  }
+},
   bindEvents(){
     $('btnLogin').onclick = () => this.loginAdmin();
 
