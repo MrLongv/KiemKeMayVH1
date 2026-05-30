@@ -283,24 +283,25 @@ exportAllAssets(year){
     });
   },
 
-  bulkPatch(rows){
+   bulkPatch(rows){
     return this.request('/api/assets/bulk', {
       method:'PATCH',
       body:JSON.stringify({rows})
     });
+  },
+
+  setPrintAllFiltered({year, q='', filter='all', value=false}){
+    return this.request('/api/assets/print-all', {
+      method:'PATCH',
+      body:JSON.stringify({
+        year: year || getSelectedYear(),
+        q,
+        filter,
+        value
+      })
+    });
   }
 };
-setPrintAllFiltered({year, q='', filter='all', value=false}){
-  return this.request('/api/assets/print-all', {
-    method:'PATCH',
-    body:JSON.stringify({
-      year: year || getSelectedYear(),
-      q,
-      filter,
-      value
-    })
-  });
-},
 /* =========================================================
    MODAL
 ========================================================= */
