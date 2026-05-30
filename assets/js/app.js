@@ -343,6 +343,7 @@ if($('btnDeleteAsset')){
     $('m_noiMua').value = a.noiMua || '';
     $('m_ghiChu').value = a.ghiChu || '';
     $('m_suaChua').value = a.suaChua || '';
+    $('m_trangThai').value = a.trangThai || 'Đang dùng';
 
     $('m_daKiemKe').checked = !!a.daKiemKe;
     $('m_chonIn').checked = !!a.chonIn;
@@ -380,6 +381,7 @@ if($('btnDeleteAsset')){
       noiMua: clean($('m_noiMua').value),
       ghiChu: clean($('m_ghiChu').value),
       suaChua: clean($('m_suaChua').value),
+      trangThai: clean($('m_trangThai').value),
 
       daKiemKe: $('m_daKiemKe').checked,
       chonIn: $('m_chonIn').checked,
@@ -480,6 +482,7 @@ const Table = {
       <td>${this.qBadge(a.bdQ3, a.bdNgayQ3)}</td>
       <td>${this.qBadge(a.bdQ4, a.bdNgayQ4)}</td>
       <td><div class="clamp">${esc(a.suaChua)}</div></td>
+      <td><span class="badge warn">${esc(a.trangThai || 'Đang dùng')}</span></td>
     </tr>`;
   },
 
@@ -564,6 +567,7 @@ const Exporter = {
         'BD Q4': a.bdQ4 ? 'TRUE' : 'FALSE',
         'Ngày BD Q4': a.bdNgayQ4,
         'Sửa chữa': a.suaChua,
+        'Trạng thái': a.trangThai || 'Đang dùng',
         'Năm': a.nam || getSelectedYear()
       }));
 
@@ -1098,6 +1102,7 @@ const App = {
       bdNgayQ4:formatDateDDMMYYYY(a.bdNgayQ4 || ''),
 
       suaChua:a.suaChua || '',
+      trangThai:a.trangThai || 'Đang dùng',
       nam:a.nam || getSelectedYear(),
       updatedAt:a.updatedAt || ''
     };
